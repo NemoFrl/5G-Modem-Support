@@ -586,12 +586,6 @@ msgstr "启用手动配置模组信息"
 msgid "(After enable, the automatic scanning and configuration function for modem information will be disabled)"
 msgstr "（启用后将禁用自动扫描并配置模组信息功能）"
 
-msgid "Network Interface Alias"
-msgstr "网络接口别名"
-
-msgid "Enable automatic creation of network interface alias (Effective upon reinstatement of dialing configuration)"
-msgstr "启用自动创建网络接口别名（重新启用拨号配置后生效）"
-
 msgid "Not null"
 msgstr "不能为空"
 
@@ -610,8 +604,11 @@ msgstr "插件版本"
 msgid "Dial Tool Info"
 msgstr "拨号工具信息"
 
-msgid "Version"
-msgstr "版本"
+msgid "quectel-CM Version"
+msgstr "quectel-CM 版本"
+
+msgid "modemmanager Version"
+msgstr "modemmanager 版本"
 
 msgid "Not installed"
 msgstr "未安装"
@@ -648,12 +645,3 @@ msgstr "通用"
 
 msgid "Private"
 msgstr "私有"
-
-msgid "Private (Quectel)"
-msgstr "私有（移远）"
-
-msgid "Private (Fibocom)"
-msgstr "私有（广和通）"
-
-msgid "Private (Meig)"
-msgstr "私有（美格）"

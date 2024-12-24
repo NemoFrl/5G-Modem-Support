@@ -94,6 +94,24 @@ o.cfgvalue = function(t, n)
     return apn
 end
 
+o = s:option(DummyValue, "arfcn", translate("ARFCN"))
+o.cfgvalue = function(t, n)
+    local arfcn = (Value.cfgvalue(t, n) or "")
+    if arfcn == "" then
+        arfcn = translate("Auto Choose")
+    end
+    return arfcn
+end
+
+o = s:option(DummyValue, "pci", translate("Physical Cell ID"))
+o.cfgvalue = function(t, n)
+    local pci = (Value.cfgvalue(t, n) or "")
+    if pci == "" then
+        pci = translate("Auto Choose")
+    end
+    return pci
+end
+
 -- 添加模块拨号日志
 m:append(Template("modem/modem_dial_log"))
 

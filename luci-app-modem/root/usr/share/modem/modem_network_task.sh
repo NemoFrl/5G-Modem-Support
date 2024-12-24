@@ -19,18 +19,19 @@ reset_network_interface()
     local at_port="$1"
     local define_connect="$2"
     local modem_no="$3"
+    local config_id="$4"
 
     local interface_name="wwan_5g_${modem_no}"
     local interface_name_ipv6="wwan6_5g_${modem_no}"
 
     #获取IPv4地址
-    local at_command="AT+CGPADDR=${define_connect}"
-    local ipv4=$(at ${at_port} ${at_command} | grep "+CGPADDR: " | sed -n '1p' | awk -F',' '{print $2}' | sed 's/"//g')
+    at_command="AT+CGPADDR=${define_connect}"
+    local ipv4=$(at ${at_port} ${at_command} | grep "+CGPADDR: " | awk -F',' '{print $2}' | sed 's/"//g')
     #输出日志
     # echo "[$(date +"%Y-%m-%d %H:%M:%S")] Get Modem new IPv4 address : ${ipv4}" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
 
     #获取DNS地址
-    local dns=$(fibocom_get_dns ${at_port} ${define_connect})
+    dns=$(fibocom_get_dns ${at_port} ${define_connect})
     local ipv4_dns1=$(echo "${dns}" | jq -r '.dns.ipv4_dns1')
     local ipv4_dns2=$(echo "${dns}" | jq -r '.dns.ipv4_dns2')
     #输出日志
@@ -60,6 +61,7 @@ reset_network_interface()
 
         #输出日志
         echo "[$(date +"%Y-%m-%d %H:%M:%S")] Reset network interface successful" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+
     fi
 }
 
@@ -83,12 +85,11 @@ gobinet_dial()
     #拨号
     local at_command
     if [ "$manufacturer" = "quectel" ]; then
-        #移远不走该分支
         at_command='ATI'
     elif [ "$manufacturer" = "fibocom" ]; then
         at_command='AT$QCRMCALL=1,3'
     elif [ "$manufacturer" = "meig" ]; then
-        at_command="AT$QCRMCALL=1,1,${define_connect},2,1"
+        at_command="ATI"
     else
         at_command='ATI'
     fi
@@ -117,15 +118,13 @@ ecm_dial()
     # at "${at_port}" "${at_command}"
 
     #拨号
-    local at_command
+    at_command
     if [ "$manufacturer" = "quectel" ]; then
         at_command="AT+QNETDEVCTL=${define_connect},3,1"
     elif [ "$manufacturer" = "fibocom" ]; then
         at_command="AT+GTRNDIS=1,${define_connect}"
     elif [ "$manufacturer" = "meig" ]; then
-        at_command="AT^NDISDUP=${define_connect},1"
-    elif [ "$manufacturer" = "huawei" ]; then
-        at_command="AT^NDISDUP=${define_connect},1"
+        at_command="AT$QCRMCALL=1,1,${define_connect},2,1"
     else
         at_command='ATI'
     fi
@@ -152,10 +151,10 @@ rndis_dial()
     local define_connect="$4"
     local modem_no="$5"
 
-    #手动拨号（广和通FM350-GL）
+    #手动设置IP（广和通FM350-GL）
     if [ "$manufacturer" = "fibocom" ] && [ "$platform" = "mediatek" ]; then
 
-        local at_command="AT+CGACT=1,${define_connect}"
+        at_command="AT+CGACT=1,${define_connect}"
         #打印日志
         dial_log "${at_command}" "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
         #激活并拨号
@@ -230,7 +229,19 @@ modem_network_task()
 
         #网络连接检查
         local at_command="AT+CGPADDR=${define_connect}"
-        local ipv4=$(at ${at_port} ${at_command} | grep "+CGPADDR: " | sed -n '1p' | awk -F',' '{print $2}' | sed 's/"//g')
+        local ipv4=$(at ${at_port} ${at_command} | grep "+CGPADDR: " | awk -F',' '{print $2}' | sed 's/"//g')
+
+        if [ -z "$ipv4" ]; then
+            for attempt in $(seq 1 5); do
+                echo "[$(date +"%Y-%m-%d %H:%M:%S")] sleep 2s check again (attempt $attempt)" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                sleep 2
+                ipv4=$(at ${at_port} ${at_command} | grep "+CGPADDR: " | awk -F',' '{print $2}' | sed 's/"//g')
+                
+                if [ -n "$ipv4" ]; then
+                    break  # If IPv4 is found, break the loop
+                fi
+            done
+        fi
 
         if [ -z "$ipv4" ]; then
 
@@ -243,6 +254,34 @@ modem_network_task()
             echo "[$(date +"%Y-%m-%d %H:%M:%S")] Unable to get IPv4 address" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
             echo "[$(date +"%Y-%m-%d %H:%M:%S")] Redefine connect to ${define_connect}" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
             service modem reload
+
+            #某些模块加载缓慢必须等待，否则会拨号失败
+            sleep 5
+
+            local arfcn=$(uci -q get modem.${config_id}.arfcn)
+            local pci=$(uci -q get modem.${config_id}.pci)
+            echo "[$(date +"%Y-%m-%d %H:%M:%S")] arfcn：$arfcn，pci：$pci" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+            if [ ! -z "$arfcn" ]; then
+                lockarfcn="$(at "${at_port}" "AT+EMMCHLCK?")"
+                fourth=$(echo "$lockarfcn" | cut -d',' -f4)
+                fifth=$(echo "$lockarfcn" | cut -d',' -f5)
+
+                if [ "$fourth" -eq "$arfcn" ] && [ "$fifth" -eq "$pci" ]; then
+                    echo "[$(date +"%Y-%m-%d %H:%M:%S")] arfcn has locked" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                else 
+                    echo "[$(date +"%Y-%m-%d %H:%M:%S")] lockarfcn now" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                    at "${at_port}" "AT+CFUN=0"
+                    at "${at_port}" "AT+EMMCHLCK=1,11,0,${arfcn},${pci},3"
+                    at "${at_port}" "AT+CFUN=1"
+                fi
+            else 
+                echo "[$(date +"%Y-%m-%d %H:%M:%S")] none arfcn" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                at "${at_port}" "AT+EMMCHLCK=0"
+            fi
+
+            sleep 5
+
+            echo "[$(date +"%Y-%m-%d %H:%M:%S")] " $(at "${at_port}" "AT+EMMCHLCK?") >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
 
             #输出日志
             echo "[$(date +"%Y-%m-%d %H:%M:%S")] Modem dial" >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
@@ -287,7 +326,7 @@ modem_network_task()
 
             #重新设置网络接口（广和通FM350-GL）
             if [ "$manufacturer" = "fibocom" ] && [ "$platform" = "mediatek" ]; then
-                reset_network_interface "${at_port}" "${define_connect}" "${modem_no}"
+                reset_network_interface "${at_port}" "${define_connect}" "${modem_no}" ${config_id}
                 sleep 3s
             fi
 
@@ -297,6 +336,37 @@ modem_network_task()
                 ifup "${interface_name_ipv6}"
             }
         fi
+
+
+        检查已连接情况下能否连上外网
+        if [ ! -z "$ipv4" ]; then
+            if [ -n "$ipv4_cache" ]; then
+                #检查外网
+                local tries=0
+                local checkpass=0
+                while [[ $tries -lt 5 ]]
+                do
+                    if /bin/ping -c 1 223.5.5.5 >/dev/null 
+                    then
+                        checkpass=1
+                        break
+                    else 
+                        checkpass=0
+                        echo "[$(date +"%Y-%m-%d %H:%M:%S")] sleep 2s check network again " >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                    fi 
+                    tries=$((tries+1))
+                    sleep 2
+                done
+
+                if [ $checkpass -eq 0 ]; then
+                    echo "[$(date +"%Y-%m-%d %H:%M:%S")] check network fail! " >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                    service modem restart
+                # else
+                #     echo "[$(date +"%Y-%m-%d %H:%M:%S")] check network succ " >> "${MODEM_RUNDIR}/modem${modem_no}_dial.cache"
+                fi
+            fi
+        fi
+
         sleep 5s
     done
 }

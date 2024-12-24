@@ -114,7 +114,7 @@ end
 		all: unset;
 	} */
 </style>
-<script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+<script type="text/javascript" src="<%=resource%>/xhr.js?v=1.4.4"></script>
 <script type="text/javascript">//<![CDATA[
 
 	window.onload=function()
@@ -801,7 +801,8 @@ end
 	}
 
 	// 定时触发更新AT串口和模组数据
-	XHR.poll(5,'<%=luci.dispatcher.build_url("admin", "network", "modem", "get_at_port")%>', null,
+	// XHR.poll(5,'<%=luci.dispatcher.build_url("admin", "network", "modem", "get_at_port")%>', null,
+	XHR.get('<%=luci.dispatcher.build_url("admin", "network", "modem", "get_at_port")%>', null,
 		function(x, data)
 		{
 			var at_ports=data["at_ports"];

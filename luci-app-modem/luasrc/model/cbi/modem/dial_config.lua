@@ -13,11 +13,6 @@ s:tab("advanced", translate("Advanced Settings"))
 
 --------general--------
 
--- 是否启用
-enable = s:taboption("general", Flag, "enable", translate("Enable"))
-enable.default = "0"
-enable.rmempty = false
-
 -- 备注
 remarks = s:taboption("general", Value, "remarks", translate("Remarks"))
 remarks.rmempty = true
@@ -77,6 +72,15 @@ getMobileNetwork()
 
 --------advanced--------
 
+-- 是否启用
+enable = s:taboption("advanced", Flag, "enable", translate("Enable"))
+enable.default = "0"
+enable.rmempty = false
+
+function enable.cfgvalue(self, section)
+    return "" -- 确保页面加载时值为空
+end
+
 -- 拨号工具
 dial_tool = s:taboption("advanced", ListValue, "dial_tool", translate("Dial Tool"))
 dial_tool.description = translate("After switching the dialing tool, it may be necessary to restart the module or restart the router to recognize the module.")
@@ -109,6 +113,18 @@ apn:value("3gnet", translate("China Unicom"))
 apn:value("ctnet", translate("China Telecom"))
 apn:value("cbnet", translate("China Broadcast"))
 apn:value("5gscuiot", translate("Skytone"))
+
+
+-- 小区
+arfcn = s:taboption("advanced", Value, "arfcn", translate("ARFCN"))
+arfcn.default = ""
+arfcn.rmempty = true
+
+-- 小区pci
+arfcn = s:taboption("advanced", Value, "pci", translate("Physical Cell ID"))
+arfcn.default = ""
+arfcn.rmempty = true
+
 
 auth = s:taboption("advanced", ListValue, "auth", translate("Authentication Type"))
 auth.default = "none"

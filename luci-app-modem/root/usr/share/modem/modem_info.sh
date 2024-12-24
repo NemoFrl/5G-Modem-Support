@@ -358,7 +358,7 @@ get_modem_info()
 
 	#检查模块状态（是否处于重启，重置，串口异常状态）
     local at_command="ATI"
-	local response=$(at ${at_port} ${at_command})
+	local response=$(sh ${SCRIPT_DIR}/modem_at.sh $at_port $at_command)
 	if [[ "$response" = *"failed"* ]] || [[ "$response" = *"$at_port"* ]]; then
 		debug "模组AT串口未就绪"
 		return
@@ -371,7 +371,6 @@ get_modem_info()
 		"fibocom") get_fibocom_info "${at_port}" "${platform}" "${define_connect}" ;;
 		"meig") get_meig_info "${at_port}" "${platform}" "${define_connect}" ;;
 		"simcom") get_simcom_info "${at_port}" "${platform}" "${define_connect}" ;;
-		"huawei") get_huawei_info "${at_port}" "${platform}" "${define_connect}" ;;
 		*) debug "未适配该模组" ;;
 	esac
 
